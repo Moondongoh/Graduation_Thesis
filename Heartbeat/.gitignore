@@ -9,3 +9,5 @@ directory_tree.txt
 model
 
 binary_audio_cnn_model.pth
+
+*.csv
