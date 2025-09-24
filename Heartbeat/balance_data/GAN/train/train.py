@@ -22,7 +22,6 @@ SEED = 42
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-# 모델 정의
 class ConvFeatNet(nn.Module):
     def __init__(self, in_channels=1, num_classes=2):
         super().__init__()
