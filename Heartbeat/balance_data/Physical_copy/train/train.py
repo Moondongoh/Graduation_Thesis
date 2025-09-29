@@ -8,7 +8,6 @@ import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 import torch.optim as optim
 
-# ----- 설정 (필요시 수정) -----
 WAVELET_CSV = r"D:\MDO\heartbeat\1_New_HB_0818\balance_data\Physical_copy\Wavelet\wavelet_features.csv"
 OUT_MODEL = r"D:\MDO\heartbeat\1_New_HB_0818\balance_data\Physical_copy\model\model_conv1d_from_wavelet.pt"
 OUT_SCALER = r"D:\MDO\heartbeat\1_New_HB_0818\balance_data\Physical_copy\model\model_conv1d_from_wavelet.scaler.pkl"
@@ -19,6 +18,7 @@ LR = 1e-3
 VAL_SPLIT = 0.1
 SEED = 42
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 # ----- 간단한 Conv1D 모델 -----
 class ConvFeatNet(nn.Module):
@@ -34,34 +34,41 @@ class ConvFeatNet(nn.Module):
             nn.AdaptiveAvgPool1d(1),
             nn.Flatten(),
             nn.Dropout(0.3),
-            nn.Linear(64, num_classes)
+            nn.Linear(64, num_classes),
         )
+
     def forward(self, x):
         return self.net(x)
+
 
 # ----- 데이터 로드/전처리 -----
 def load_wavelet_csv(path):
     df = pd.read_csv(path)
-    if 'label' not in df.columns:
+    if "label" not in df.columns:
         raise SystemExit("ERROR: CSV에 'label' 컬럼이 필요합니다.")
-    # 라벨 결측 제거
-    df = df.dropna(subset=['label']).copy()
+
+    df = df.dropna(subset=["label"]).copy()
     if df.empty:
         raise SystemExit("ERROR: label이 채워진 행이 없습니다.")
-    # label을 정수형(0/1)으로 보장
-    df['label'] = df['label'].astype(int)
-    # 특징 컬럼: 숫자형 컬럼 중 label 제외
-    feat_cols = [c for c in df.select_dtypes(include=[np.number]).columns if c != 'label']
+
+    df["label"] = df["label"].astype(int)
+
+    feat_cols = [
+        c for c in df.select_dtypes(include=[np.number]).columns if c != "label"
+    ]
     X = df[feat_cols].values.astype(np.float32)
-    y = df['label'].values.astype(np.int64)
+    y = df["label"].values.astype(np.int64)
     return X, y, feat_cols
+
 
 def main():
     np.random.seed(SEED)
     torch.manual_seed(SEED)
 
     X, y, feat_cols = load_wavelet_csv(WAVELET_CSV)
-    print(f"Loaded features: {X.shape}, labels: {y.shape}, features cols: {len(feat_cols)}")
+    print(
+        f"Loaded features: {X.shape}, labels: {y.shape}, features cols: {len(feat_cols)}"
+    )
 
     # 스케일링
     scaler = StandardScaler().fit(X)
@@ -70,11 +77,9 @@ def main():
     joblib.dump(scaler, OUT_SCALER)
     print("Saved scaler:", OUT_SCALER)
 
-    # Tensor 변환: (N, features) -> (N, 1, features) for Conv1d
     Xt = torch.tensor(Xs).unsqueeze(1)
     yt = torch.tensor(y)
 
-    # train/val split
     n = len(yt)
     idx = np.arange(n)
     np.random.shuffle(idx)
@@ -91,7 +96,7 @@ def main():
     criterion = nn.CrossEntropyLoss()
     opt = optim.Adam(model.parameters(), lr=LR)
 
-    for epoch in range(1, EPOCHS+1):
+    for epoch in range(1, EPOCHS + 1):
         model.train()
         total_loss = 0.0
         correct = 0
@@ -110,7 +115,6 @@ def main():
         train_loss = total_loss / total
         train_acc = correct / total
 
-        # 검증
         model.eval()
         vloss = 0.0
         vcorrect = 0
@@ -127,11 +131,13 @@ def main():
         val_loss = vloss / max(1, vtotal)
         val_acc = vcorrect / max(1, vtotal)
 
-        print(f"Epoch {epoch}/{EPOCHS}  train_loss:{train_loss:.4f} acc:{train_acc:.4f}  val_loss:{val_loss:.4f} val_acc:{val_acc:.4f}")
+        print(
+            f"Epoch {epoch}/{EPOCHS}  train_loss:{train_loss:.4f} acc:{train_acc:.4f}  val_loss:{val_loss:.4f} val_acc:{val_acc:.4f}"
+        )
 
-    # 모델 저장
     torch.save(model.state_dict(), OUT_MODEL)
     print("Saved model:", OUT_MODEL)
+
 
 if __name__ == "__main__":
     main()
